@@ -1,0 +1,617 @@
+<<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Practica Canvas5, CruzMorenoJesusEnrique</title>
+  </head>
+
+  <body style="background-color: rgb(214, 214, 214)"> 
+    <center><canvas id="canvas01" width="990" height="1000"> </canvas></center>
+  </body>
+  
+  <div style="display:none;"> 
+    <img id="player" src="Cirnaca/Down.png" width="32" height="32" />
+    <img id="bomb" src="Cirnaca/Bomba.png" width="32" height="32" /> 
+    <img id="expo" src="Cirnaca/EXP.png" width="32" height="32" />
+    <img id="coin" src="Cirnaca/Coin.png" width="32" height="32" />
+
+    <img id="floor" src="mundos/TEMPLO/SUELO.png" width="32" height="32" />
+    <img id="broken" src="mundos/TEMPLO/ROMPIBLE.png" width="32" height="32" />
+    <img id="wall" src="mundos/TEMPLO/MURO.png" width="32" height="32" />
+
+    <img id="menu" src="menu/menu.jpg" width="1920" height="1080" />
+
+    <img id="bg" src="fondos/TEMPLO.png" width="270" height="220" /> </div>
+
+    <div id="tempo">Tiempo: 00:00</div>
+
+
+  <script>
+    window.requestAnimationFrame = (function () {
+      return (
+        window.requestAnimationFrame ||
+        window.webkitRequestAnimationFrame ||
+        window.mozRequestAnimationFrame ||
+        function (callback) {
+          window.setTimeout(callback, 17);
+        }
+      );
+    })();
+    window.requestAnimationFrame(update);
+    //LA CASILLAS VAN A MEDIR 40 por que el espacio a usar 960
+    //POR LO TANTO TENEMOS UN TOTAL DE 24*24 = 576
+    //MEDIDA DE BLOQUE NUEVA ES 32 POR LO TANTO TENEMOS UN TOTAL DE 24*32 = 768
+
+   //CLASE JUGADOR --------
+   class Jugador {
+      constructor(w, h) {
+        this.x = 0;
+        this.y = 0;
+        this.w = w;
+        this.h = h;
+        // this.speed = 8;
+      }
+
+      pintar(ctx) {
+        //ctx.fillStyle = "Cyan";
+        //ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.drawImage(playerIMG,this.x, this.y, this.w, this.h);
+      }
+    }
+
+    class Muro{
+      constructor(x, y, w, h, destruible) {
+        this.x = x;
+        this.y = y;
+        this.w = w;
+        this.h = h;
+        this.destruible = destruible;
+        this.destruido = false;
+      }
+
+
+      pintar (ctx){
+        if(!this.destruible){
+          //ctx.fillStyle = "Gray";
+          // ctx.fillRect(this.x, this.y, this.w, this.h);
+           ctx.drawImage(wallIMG,this.x, this.y, this.w, this.h);
+        }else{ 
+          //ctx.fillStyle = "#C70039";
+          // ctx.fillRect(this.x, this.y, this.w, this.h);
+           ctx.drawImage(brokenIMG,this.x, this.y, this.w, this.h);
+        }
+
+      }
+
+      playerCollider(personaje) {
+        if (
+            this.x < personaje.x + personaje.w  &&  
+                this.x + this.w > personaje.x &&    
+                this.y < personaje.y + personaje.h &&    
+                this.y + this.h> personaje.y
+        ) {
+          console.log("Chin me pegue!");
+          switch (dir) {
+            case 0:
+              personaje.y += this.h;
+              break;
+
+            case 1:
+              personaje.y -= this.h;
+              break;
+
+            case 2:
+              personaje.x -= this.w;
+              break;
+
+            case 3:
+              personaje.x += this.w;
+              break;
+
+            default:
+              break;
+          }
+          dir = 4;
+          return true;
+        }
+        return false;
+      }
+    }
+
+    class Bomba{
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.w = 32;
+        this.h = 32;
+        this.alcance = 2;
+
+        this.tempo = 200;
+      }
+
+      pintar(ctx){
+        //ctx.fillStyle = "purple";
+        //ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.drawImage(bombIMG,this.x, this.y, this.w, this.h);
+      }
+    }
+
+    class explosion{
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.w = 32;
+        this.h = 32;
+
+        this.tempo = 50;
+      }
+
+      pintar(ctx){
+        //ctx.fillStyle = "orange";
+        //ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.drawImage(exploIMG,this.x, this.y, this.w, this.h);
+      }
+
+    }
+
+    class Bono {
+      constructor(x, y) {
+        this.x = x;
+        this.y = y;
+        this.w = 32;
+        this.h = 32;
+        this.tomada = false;
+      }
+
+      pintar(ctx) {
+       // ctx.fillStyle = "yellow";
+        //ctx.fillRect(this.x, this.y, this.w, this.h);
+        ctx.drawImage(coinIMG,this.x, this.y, this.w, this.h);
+      }
+
+      playerCollider(personaje) {
+        if (
+            this.x < personaje.x + personaje.w  &&  
+                this.x + this.w > personaje.x &&    
+                this.y < personaje.y + personaje.h &&    
+                this.y + this.h> personaje.y
+        ) {
+          console.log("Monedita monedita!");
+          coinpick.play();
+          score++;
+          this.tomada = true;
+          return true;
+        }
+        return false;
+      }
+    }
+    var canvas = document.getElementById("canvas01");
+    var ctx = canvas.getContext("2d");
+    var casilla = 24; var medida = 32;
+    var estado = 0; var pausa = false;
+    var onlyOneKey = false; var onlyOneBomb = false;
+
+    var score = 0, scoreNecesaria = 5, nivel = 0, gameover = false, finishedlevel = false;
+    var rotosTotal = 0, rotosReset = 0, colocadosTotal = 0;
+    //var maxbombas = 0;
+
+    let bombasManager = [];
+    let explosivosManager = [];
+    let monedasManager = [];
+    //let pisoManager = [];
+
+    var mundos =["LAVA","TEMPLO","HIELO"];
+    let musica = new Audio();
+    musica.src="musica/TEMPLO.mp3";
+    let musicaOver = new Audio();
+
+    let bombplace = new Audio("efectos/bombplace.wav");  let explosound = new Audio("efectos/explo.wav");
+     let coinpick = new Audio("efectos/coin.wav"); let victorysound = new Audio("efectos/victory.wav");
+     let walksound = new Audio("efectos/walk.wav");  let deadSound= new Audio("efectos/dead.wav");
+
+     //TEMPORIZADOR
+     const temporizadorElement = document.getElementById("tempo"); 
+     var stopTempo = false;
+     var tiempoTotal = 0;
+
+
+    //IMAGENES
+    const playerIMG = document.getElementById("player");
+    const bombIMG = document.getElementById("bomb");
+    const coinIMG = document.getElementById("coin");
+    const exploIMG = document.getElementById("expo");
+    const floorIMG = document.getElementById("floor");
+    const brokenIMG = document.getElementById("broken");
+    const wallIMG = document.getElementById("wall");
+    const bgIMG = document.getElementById("bg"); 
+    const menuIMG = document.getElementById("menu"); 
+    //JUGADOR
+    var pj = new Jugador(32,32);
+    var dir = 0;
+
+    document.addEventListener("keydown", (event) => {
+      if(estado == 1){
+        if(!onlyOneKey && !pausa && !gameover && !finishedlevel){
+        switch (event.keyCode) {
+        case 87:
+          dir = 0;
+          document.getElementById("player").src="Cirnaca/Up.png";
+          pj.y -= medida;
+          walksound.play();
+          //y -= 8;
+          break;
+
+        case 83:
+          dir = 1;
+          document.getElementById("player").src="Cirnaca/Down.png";
+          walksound.play();
+          pj.y += medida;
+          break;
+
+        case 68:
+          dir = 2;
+          document.getElementById("player").src="Cirnaca/Right.png";
+          walksound.play();
+          pj.x += medida;
+          //x += 8;
+          break;
+
+        case 65:
+          dir = 3;
+          document.getElementById("player").src="Cirnaca/Left.png";
+          walksound.play();
+          pj.x -= medida;
+          //x -= 8;
+          break;
+
+        default:
+          break;
+      }
+      }
+      onlyOneKey = true;
+
+      if(event.keyCode == 27){
+        console.log("a");
+        if (!pausa) {
+              pausa = true;
+              musica.pause();
+            }else{
+              pausa = false;
+              musica.play();
+            }
+      }
+
+      if(!onlyOneBomb && !pausa && event.keyCode == 69 && !gameover && !finishedlevel){
+        var check = true;
+        for(let x = 0; x < bombasManager.length; x++){
+          if(bombasManager[x].x == pj.x && bombasManager[x].y == pj.y){
+            check = false;
+          }
+        }
+        if(check && bombasManager.length < 3){
+          bombasManager.push(new Bomba(pj.x, pj.y));
+          bombplace.play();
+          onlyOneBomb = true;
+        }
+      }
+      }else if(estado==0 && event.keyCode == 69){
+        estado++;
+        generacion();
+      }
+
+      if(finishedlevel && event.keyCode == 69){
+        finishedlevel = false;
+        musica.pause();
+        generacion();
+      }
+
+      if(gameover && event.keyCode == 69){
+        location.reload();
+      }
+     
+    });
+
+
+    //MURO = M, UBICACIONES DE SPAWN= X, TODO LO DEMAS SE PUEDE LLENAR
+    const nivel_prueba = [
+  ['M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M'],
+  ['M','x','x',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'x','x','M'],
+  ['M','x','M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,   ,'M',   ,'x','M'],
+  ['M','x',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'x','M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'M'],
+  ['M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,'M'],
+  ['M','x',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'x','M'],
+  ['M','x','M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,'M',   ,   ,   ,'M',   ,'x','M'],
+  ['M','x','x',   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,   ,'x','x','M'],
+  ['M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M','M']
+];
+
+let bloquesEnCavas = [];
+
+function generacion(){
+  
+  var mundoSEL = Math.random();
+  //<img id="floor" src="mundos/TEMPLO/SUELO.png" width="32" height="32" /> </div>
+    //<img id="broken" src="mundos/TEMPLO/ROMPIBLE.png" width="32" height="32" /> </div>
+    //<img id="wall" src="mundos/TEMPLO/MURO.png" width="32" height="32" /> </div>
+    //<img id="bg" src="fondos/TEMPLO.png" width="990" height="1000" /> </div>
+    //document.getElementById("player").src="Cirnaca/Down.png";
+  if(mundoSEL <= 0.32){
+    mundoSEL = 0;
+
+  }else if(mundoSEL >= 0.33 && mundoSEL <= 0.62){
+    mundoSEL = 1;
+  }else{
+    mundoSEL = 2;
+  }
+
+  document.getElementById("floor").src="mundos/"+mundos[mundoSEL]+"/SUELO.png";
+  document.getElementById("broken").src="mundos/"+mundos[mundoSEL]+"/ROMPIBLE.png";
+  document.getElementById("wall").src="mundos/"+mundos[mundoSEL]+"/MURO.png";
+  document.getElementById("bg").src="fondos/"+mundos[mundoSEL]+".png";
+
+  musica = new Audio("musica/"+mundos[mundoSEL]+".mp3");
+  musica.volume = 0.5;
+
+
+  bloquesEnCavas = [];
+  bombasManager = [];
+  explosivosManager = [];
+  monedasManager = [];
+  spawnjugador = 0;
+
+  score = 0; 
+  nivel++;
+  //probabilidadMoneda = 5;
+  colocadosTotal = 0;
+  rotosTotal = 0;
+  
+  scoreNecesaria = 5;
+
+  stopTempo = false;
+  tiempoTotal = 0;
+
+  for (let f = 0; f < 31; f++){
+    bloquesEnCavas[f] = [];
+
+    for (let c = 0; c < 24; c++){
+      if(!nivel_prueba[f][c] && Math.random() < 0.85){
+        bloquesEnCavas[f][c] = new Muro((32*f),(32*c),32,32, true);
+        colocadosTotal++;
+
+      }else if (nivel_prueba[f][c] == 'M'){
+        bloquesEnCavas[f][c] = new Muro((32*f),(32*c),32,32, false);
+      }else if (nivel_prueba[f][c] == 'x'){
+        if(spawnjugador != 101){
+          if(Math.random() < 0.10){
+            spawnjugador = 101;
+            pj.x = 32*f;
+            pj.y = 32*c;
+          }else{
+            spawnjugador += 8;
+
+            if(spawnjugador >= 100){
+              spawnjugador = 101;
+               pj.x = 32*f;
+               pj.y = 32*c;
+            }
+          }
+        }
+
+      }
+    }
+  }
+  //musica.loop();
+  musica.play();
+}
+
+
+
+  //generacion();
+
+  function actualizarTemporizador() {
+        if (!stopTempo) {
+           tiempoTotal++;
+            temporizadorElement.textContent = `Tiempo: ${settearTiempo(tiempoTotal)}`;
+        }
+    }
+
+    function detenerTiempo() {
+        stopTempo = true;
+    }
+    function renaudarTiempo(){
+      stopTempo = false;
+    }
+    function settearTiempo(tiempo) {
+        const minutos = Math.floor(tiempo / 60);
+        const segundos = tiempo % 60;
+        const minutosFormateados = minutos < 10 ? `0${minutos}` : minutos;
+        const segundosFormateados = segundos < 10 ? `0${segundos}` : segundos;
+        return `${minutosFormateados}:${segundosFormateados}`;
+    }
+
+
+  function update() {
+    if(estado == 1){
+      actualizarTemporizador();
+      repaint();
+    }else{
+      repaintMenu ()
+    }
+    
+    if(score == scoreNecesaria){
+      finishedlevel=true;
+      detenerTiempo();
+    }
+    window.requestAnimationFrame(update);
+    onlyOneKey = false;
+    onlyOneBomb = false;
+  }
+
+  function repaintMenu (){
+    ctx.drawImage(menuIMG,-600, -80, 1920, 1080);
+    ctx.fillStyle = "aliceblue";
+    ctx.font = "60px CALIBRI";
+    ctx.fillText("BOMBERFAIRY", 100, 450);
+    ctx.font = "30px Arial";
+    ctx.fillText("Presiona E para comenzar", 100, 530);
+  }
+
+  function repaint() {
+    ctx.fillStyle = "aliceblue";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(bgIMG,0, 767-350, 270+720, 290+720);
+    for(let x = 0; x < 31; x++){
+      for(let y = 0; y < 24; y++){
+
+        ctx.drawImage(floorIMG,(32*x), (32*y), 32, 32);
+
+        if(bloquesEnCavas[x][y] && !bloquesEnCavas[x][y].destruido){bloquesEnCavas[x][y].pintar(ctx); bloquesEnCavas[x][y].playerCollider(pj);
+        }
+
+        for(let s = 0; s < explosivosManager.length; s++){
+          if(bloquesEnCavas[x][y] && !bloquesEnCavas[x][y].destruido && bloquesEnCavas[x][y].destruible && 
+          bloquesEnCavas[x][y].x == explosivosManager[s].x && bloquesEnCavas[x][y].y == explosivosManager[s].y)
+          {
+            bloquesEnCavas[x][y].destruido = true;
+            rotosTotal++;
+            rotosReset++;
+
+            var a = Math.random()*100;
+            var b = ((rotosTotal / colocadosTotal) * 100);
+            console.log(a +" - "+ b);
+            if(b >= a+25 || ((rotosReset / colocadosTotal) * 100 > 24)){
+              monedasManager.push(new Bono(bloquesEnCavas[x][y].x,  bloquesEnCavas[x][y].y));
+              rotosReset = 0;
+            }
+
+          }
+
+          if(explosivosManager[s].x == pj.x && explosivosManager[s].y == pj.y && !gameover){
+            deadSound.play();
+            detenerTiempo();
+            musica.pause();
+            musicaOver = new Audio("musica/"+"OVER"+".mp3");
+            musicaOver.volume = 0.4; musicaOver.play();
+            gameover = true;
+          }
+        }
+
+       
+     }
+    }
+
+    for(let x = 0; x < bombasManager.length; x++){
+      if(bombasManager[x] && bombasManager[x].tempo > 0){
+        bombasManager[x].tempo--;
+        console.log( bombasManager[x].tempo);
+        bombasManager[x].pintar(ctx);
+      }
+
+      if(bombasManager[x].tempo <= 0){
+        for(let pos = 0; pos < bombasManager[x].alcance; pos++){
+          explosivosManager.push(new explosion(bombasManager[x].x,bombasManager[x].y));
+          explosivosManager.push(new explosion(bombasManager[x].x+(32*(pos+1)),bombasManager[x].y));
+          explosivosManager.push(new explosion(bombasManager[x].x-(32*(pos+1)),bombasManager[x].y));
+          explosivosManager.push(new explosion(bombasManager[x].x,bombasManager[x].y+(32*(pos+1))));
+          explosivosManager.push(new explosion(bombasManager[x].x,bombasManager[x].y-(32*(pos+1))));
+        }     
+        explosound.play();
+      }
+      bombasManager = bombasManager.filter((bomba) => bomba.tempo > 0);
+    }
+
+    for(let x = 0; x < explosivosManager.length; x++){
+      if(explosivosManager[x] && explosivosManager[x].tempo > 0){
+        explosivosManager[x].tempo--;
+        //console.log( explosivosManager[x].tempo);
+        explosivosManager[x].pintar(ctx);
+      }
+
+      explosivosManager = explosivosManager.filter((explosivo) => explosivo.tempo > 0);
+    }
+
+    for(let x = 0; x < monedasManager.length; x++){
+      monedasManager[x].pintar(ctx);
+      monedasManager[x].playerCollider(pj);
+
+      monedasManager = monedasManager.filter((moneda) => moneda.tomada == false);
+    }
+
+    pj.pintar(ctx);
+    
+    ctx.fillStyle = "rgb(240,240,240,0.5)";
+    ctx.fillRect(canvas.width-190, 767, 190 , 120);
+    ctx.fillRect(0, 767, 420 , 400);
+    ctx.fillStyle = "black";
+    ctx.font = "30px Arial";
+    ctx.fillText("Puntaje: " + score + " / 5", canvas.width-180, 767+30);
+    ctx.fillText("Nivel: " + nivel, canvas.width-118, 767+70);
+    ctx.fillText(`Tiempo: ${settearTiempo(tiempoTotal)}`, canvas.width-190, 767+110);
+
+    ctx.font = "30px Arial";
+    ctx.fillText("INSTRUCCIONES: ", 0, 767+30);
+    ctx.fillText("CONTROLES:", 0, 767+110);
+
+    ctx.font = "25px Arial";
+    ctx.fillText("Encuentra las 5 monedas para ganar", 0, 767+70);
+    
+    ctx.fillText("WASD -> MOVIMIENTO", 0, 767+150);
+    ctx.fillText("E-> BOMBA", 0, 767+190);
+    ctx.fillText("ESC-> PAUSA", 0, 767+230);
+
+    if(pausa){
+      ctx.fillStyle = "rgb(214, 214, 214, 0.8)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "black";
+      ctx.font = "50px Arial";
+      ctx.fillText("PAUSA", canvas.width/2-50, canvas.height/2);
+    }
+
+    if(gameover){
+      ctx.fillStyle = "rgb(214, 10, 10, 0.5)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "WHITE";
+      ctx.font = "50px Arial";
+      ctx.fillText("¡EXPLOTASTE!", canvas.width/2-200, canvas.height/2);
+      ctx.fillText("Pulsa E para reiniciar", canvas.width/2-250, canvas.height/2+60);
+    }
+
+    if(finishedlevel){
+      ctx.fillStyle = "rgb(10, 180, 90, 0.5)";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = "WHITE";
+      ctx.font = "50px Arial";
+      ctx.fillText("¡GANASTE!", canvas.width/2-200, canvas.height/2);
+      ctx.fillText("Pulsa E para AVANZAR", canvas.width/2-250, canvas.height/2+60);
+
+    }
+    
+      
+     //ctx.fillText("Score: ", 5,30);
+    
+  }
+  </script>
+</html>
